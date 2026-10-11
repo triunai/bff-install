@@ -8,6 +8,44 @@
 
 Short installers for [bff](https://github.com/triunai/bff). This repository holds only the two install scripts; the product lives in the public `triunai/bff` repository and is downloaded over plain HTTPS, verified against its `SHA256SUMS`. No login is needed; if the GitHub CLI (`gh`) is installed and signed in it is used instead.
 
+## Set up first, in this order
+
+bff runs inside a setup of three tools. Install them first; each link goes to the official download.
+
+### 1. Python 3.9 or newer (required)
+
+bff is written in Python, and the installer uses it to check the download.
+
+- **Mac:** download from [python.org/downloads](https://www.python.org/downloads/), or `brew install python` if you use [Homebrew](https://brew.sh).
+- **Windows:** `winget install Python.Python.3.12`, or download from [python.org/downloads/windows](https://www.python.org/downloads/windows/). The Microsoft Store "python" shortcut doesn't count; the installer refuses it.
+- **Linux:** your package manager, e.g. `sudo apt install python3`.
+
+Check: `python3 --version` (Windows: `py -3 --version`).
+
+### 2. Node.js 22.19 or newer (LTS)
+
+BB needs it, and so do the Osiris terminal apps.
+
+- **Mac:** download the LTS from [nodejs.org/en/download](https://nodejs.org/en/download), or `brew install node`.
+- **Windows:** `winget install OpenJS.NodeJS.LTS`, or the LTS installer from [nodejs.org/en/download](https://nodejs.org/en/download). Use the real `node.exe`; `node.cmd` wrappers are refused.
+- **Already use nvm, fnm, volta or mise?** That's fine. bff finds Node in their normal folders, so `nvm install --lts` is enough. You don't need nvm if you don't already have it.
+
+Check: `node --version`.
+
+### 3. BB (the app Osiris lives in)
+
+- **Mac / Linux / Windows:** `npx bb-app@latest` (needs step 2).
+- **Windows, as an app:** the `bb-<version>-x64.exe` installer from [github.com/get-bb/bb/releases](https://github.com/get-bb/bb/releases).
+- Version 0.45 or newer.
+
+> **Osiris isn't shipped to teammates yet.** The current bff release doesn't include the Osiris plugin, so in BB, `bff osiris setup` says "Osiris is not publicly released yet." Everything else in bff works now. This note goes away once Osiris is published.
+
+### Optional
+
+- **Git** ([git-scm.com/downloads](https://git-scm.com/downloads); Windows: `winget install Git.Git`): for the features that read your repo's history.
+- **GitHub CLI** ([cli.github.com](https://cli.github.com)): not needed. The release is public and downloads over plain HTTPS. If `gh` is installed and signed in, it's used instead (`BFF_DOWNLOAD=https` forces the plain download, `BFF_DOWNLOAD=gh` forces `gh`).
+- **npm/nvm for development:** only if you change bff or Osiris itself; that needs Node 24.
+
 ## Install
 
 macOS and Linux:
@@ -22,22 +60,7 @@ Windows (PowerShell 5.1 or 7, no admin rights needed):
 irm https://raw.githubusercontent.com/triunai/bff-install/main/install.ps1 | iex
 ```
 
-Run either from any directory. Re-running is safe: it installs the same verified release again or moves to a newer one.
-
-## Before you run it
-
-You don't need npm, nvm or Node to install bff. The only hard requirement is Python.
-
-| Tool | Needed for | Required? |
-| --- | --- | --- |
-| **Python 3.9+** | bff itself, and the installer's checksum check | **Yes.** macOS/Linux: `python3`. Windows: `py -3` or `python` (the Microsoft Store stub is refused); `winget install Python.Python.3.12` if missing. The installer stops and tells you the exact command if it's absent. |
-| `curl` or `wget` | the download on macOS/Linux | Already on every Mac and almost every Linux. Windows uses PowerShell's own downloader. |
-| Git | adopting a repo (`bff` reads your repo's history) | Only for repo features. |
-| Node 22.6+ | the terminal apps (`bff osiris factory`, `worktrees`, `prune`) | No. Only when you use those. Any normal install is found: nodejs.org, Homebrew, nvm, fnm, volta or mise (Windows: Program Files, winget, scoop, fnm, nvm-windows, volta). On Windows install the real `node.exe`; `node.cmd` wrappers are refused. |
-| BB | Osiris, the dashboard inside BB | No. BB is a separate app with its own installer, and it brings its own Node requirement (22.19+). If BB is missing, setup tells you what to install and bff still works. |
-| GitHub CLI (`gh`) | nothing | No. Nothing to sign in to: the release is public and downloads over plain HTTPS. If `gh` is installed and signed in, it's used instead (`BFF_DOWNLOAD=https` forces the plain download, `BFF_DOWNLOAD=gh` forces `gh`). |
-
-npm and nvm only matter if you're developing bff or Osiris (running the Osiris tests or rebuilding the plugin), and then you need Node 24.
+Run either from any directory. Re-running is safe: it installs the same verified release again or moves to a newer one. Afterwards, `bff doctor` checks the helper tools (Herdr, Beads, OMC, OMX) and offers to install or update them; for BB it prints the manual steps above.
 
 ## What it does
 
