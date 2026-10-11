@@ -1,11 +1,13 @@
 # bff installer for native Windows (PowerShell 5.1 and 7, no admin). Public; it downloads the bff release from the
-# private triunai/bff repository through the GitHub CLI (gh), verifies SHA256SUMS, installs under
+# public triunai/bff repository over plain HTTPS (no account, no login; the GitHub CLI is used instead only when it is
+# installed and signed in), verifies SHA256SUMS, installs under
 # %LOCALAPPDATA%\bff (a bff.cmd shim in %LOCALAPPDATA%\bff\bin), offers to add it to your user PATH, and runs
 # `bff osiris setup`.
 #   irm https://raw.githubusercontent.com/triunai/bff-install/main/install.ps1 | iex
 # Options through environment variables (set them first, e.g. $env:BFF_YES = '1'):
 #   BFF_YES=1  BFF_NO_SETUP=1  BFF_NO_MODIFY_PATH=1  BFF_PREFIX=<dir>  BFF_VERSION=x.y.z (default: latest release)
-#   BFF_RELEASE_DIR=<dir holding bff-X.Y.Z.tar.gz and SHA256SUMS>  installs from that folder instead of gh (CI, offline);
+#   BFF_DOWNLOAD=https|gh  forces the download method.
+#   BFF_RELEASE_DIR=<dir holding bff-X.Y.Z.tar.gz and SHA256SUMS>  installs from that folder instead of downloading (CI, offline);
 #       the SHA256 check and the archive checks are the same as for a download.
 #   BFF_RESULT_FILE=<file>  also writes install.py's JSON result there (the console also gets it).
 # Everything runs inside a function and never calls `exit`, so piping into iex cannot close your terminal.
@@ -100,17 +102,21 @@ function Install-Bff {
 
     if ($Version -and $Version -notmatch '^[0-9]+(\.[0-9]+)*$') { throw 'BFF_VERSION must look like 1.2.3.' }
 
-    $useGh = -not $ReleaseDir
+    # Public repository: a plain HTTPS download needs no account. gh is used only when it is installed AND signed in
+    # (or BFF_DOWNLOAD=gh); BFF_DOWNLOAD=https forces the plain download. SHA256SUMS is verified either way.
+    $useGh = $false
     $gh = $null
-    if ($useGh) {
-        $gh = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $gh) {
-            throw ("bff lives in a private repository, so this installer needs the GitHub CLI (gh).`n" +
-                "  winget install --id GitHub.cli -e   (or https://cli.github.com)`n" +
-                "Then run: gh auth login   (the account needs read access to $repo) and run this installer again.")
+    if (-not $ReleaseDir) {
+        $method = $env:BFF_DOWNLOAD
+        if ($method -and $method -ne 'gh' -and $method -ne 'https') { throw 'BFF_DOWNLOAD must be gh or https.' }
+        if ($method -ne 'https') {
+            $gh = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($method -eq 'gh' -and -not $gh) { throw 'BFF_DOWNLOAD=gh needs the GitHub CLI (https://cli.github.com).' }
+            if ($gh) {
+                $auth = Invoke-Captured $gh.Source @('auth', 'status') 60
+                if ($auth.Code -eq 0 -or $method -eq 'gh') { $useGh = $true }
+            }
         }
-        $auth = Invoke-Captured $gh.Source @('auth', 'status') 60
-        if ($auth.Code -ne 0) { throw "The GitHub CLI is not signed in. Run: gh auth login   (the account needs read access to $repo), then run this installer again." }
     } elseif (-not (Test-Path -LiteralPath $ReleaseDir -PathType Container)) {
         throw "BFF_RELEASE_DIR is not a folder: $ReleaseDir"
     }
@@ -125,8 +131,24 @@ function Install-Bff {
             $dl = Invoke-Captured $gh.Source $downloadArgs
             if ($dl.Code -ne 0) {
                 if ($dl.Err) { Write-Host $dl.Err.Trim() }
-                throw "Download failed. Check that this gh account can read $repo (gh release list --repo $repo) and that a release is published, then run this installer again."
+                throw "Download failed. Check your network and that a release is published at https://github.com/$repo/releases, then run this installer again."
             }
+        } elseif (-not $ReleaseDir) {
+            # Windows PowerShell 5.1 defaults to TLS 1.0/1.1 and its progress bar makes downloads very slow.
+            try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+            $savedProgress = $ProgressPreference
+            $ProgressPreference = 'SilentlyContinue'
+            $baseUrl = "https://github.com/$repo/releases/latest/download"
+            if ($Version) { $baseUrl = "https://github.com/$repo/releases/download/v$Version" }
+            $failText = "Download failed. Check your network and that a release is published at https://github.com/$repo/releases, then run this installer again."
+            try {
+                $sumsFile = Join-Path $stage 'SHA256SUMS'
+                try { Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/SHA256SUMS" -OutFile $sumsFile } catch { throw ($failText + " (" + $_.Exception.Message + ")") }
+                $names = @(Get-Content -LiteralPath $sumsFile | Where-Object { $_.Trim() } | ForEach-Object { , ($_.Trim() -split '\s+') } |
+                    Where-Object { $_.Count -eq 2 -and $_[1] -match '^bff-[0-9][0-9.]*\.tar\.gz$' } | ForEach-Object { $_[1] })
+                if ($names.Count -ne 1) { throw ("SHA256SUMS does not name exactly one bff archive. " + $failText) }
+                try { Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/$($names[0])" -OutFile (Join-Path $stage $names[0]) } catch { throw ($failText + " (" + $_.Exception.Message + ")") }
+            } finally { $ProgressPreference = $savedProgress }
         } else {
             $pattern = 'bff-*.tar.gz'
             if ($Version) { $pattern = "bff-$Version.tar.gz" }

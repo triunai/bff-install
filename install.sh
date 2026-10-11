@@ -1,10 +1,10 @@
 #!/bin/sh
-# bff installer for macOS and Linux (POSIX sh). Public; it downloads the bff release from the private
-# triunai/bff repository through the GitHub CLI (gh), verifies SHA256SUMS, installs under ~/.local (no sudo)
-# and runs `bff osiris setup`.
+# bff installer for macOS and Linux (POSIX sh). Public; it downloads the bff release from the public triunai/bff
+# repository over plain HTTPS (no account, no login), verifies SHA256SUMS, installs under ~/.local (no sudo)
+# and runs `bff osiris setup`. The GitHub CLI (gh) is used instead only when it is installed and signed in.
 #   curl -fsSL https://raw.githubusercontent.com/triunai/bff-install/main/install.sh | sh
 # Options (after `sh -s --` when piped): --yes  --no-setup  --no-modify-path  --prefix DIR  --help
-# Env: BFF_VERSION=x.y.z installs that release instead of the latest.
+# Env: BFF_VERSION=x.y.z installs that release instead of the latest. BFF_DOWNLOAD=https|gh forces the download method.
 # Every command that could read stdin gets </dev/null or </dev/tty: when this script is piped, stdin IS the script.
 set -eu
 
@@ -39,34 +39,50 @@ main() {
   command -v python3 >/dev/null 2>&1 || { echo "$PYTHON_HELP" >&2; exit 1; }
   python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' </dev/null || { echo "$PYTHON_HELP" >&2; exit 1; }
 
-  if ! command -v gh >/dev/null 2>&1; then
-    cat >&2 <<MSG
-bff lives in a private repository, so this installer needs the GitHub CLI (gh).
-Install it:
-  macOS:          brew install gh
-  Debian/Ubuntu:  https://github.com/cli/cli/blob/trunk/docs/install_linux.md
-  other:          https://cli.github.com
-Then run:  gh auth login   (the account needs read access to $BFF_REPO)
-and run this installer again.
-MSG
-    exit 1
-  fi
-  if ! gh auth status >/dev/null 2>&1 </dev/null; then
-    echo "The GitHub CLI is not signed in. Run: gh auth login   (the account needs read access to $BFF_REPO), then run this installer again." >&2
-    exit 1
-  fi
+  # Public repository: a plain HTTPS download needs no account. gh is used only when it is installed AND signed in
+  # (or BFF_DOWNLOAD=gh); BFF_DOWNLOAD=https forces the plain download. SHA256SUMS is verified either way.
+  BFF_USE_GH=0
+  case ${BFF_DOWNLOAD:-} in
+    gh)
+      command -v gh >/dev/null 2>&1 || { echo 'BFF_DOWNLOAD=gh needs the GitHub CLI (https://cli.github.com).' >&2; exit 1; }
+      BFF_USE_GH=1 ;;
+    https) ;;
+    '') if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 </dev/null; then BFF_USE_GH=1; fi ;;
+    *) echo 'BFF_DOWNLOAD must be gh or https.' >&2; exit 2 ;;
+  esac
 
   BFF_STAGE=$(mktemp -d "${TMPDIR:-/tmp}/bff-install.XXXXXXXX")
   trap 'rm -rf "$BFF_STAGE"' EXIT HUP INT TERM
 
-  BFF_FAIL="Download failed. Check that this gh account can read $BFF_REPO (gh release list --repo $BFF_REPO) and that a release is published, then run this installer again."
+  BFF_FAIL="Download failed. Check your network and that a release is published at https://github.com/$BFF_REPO/releases, then run this installer again."
   if [ -n "${BFF_VERSION:-}" ]; then
     case $BFF_VERSION in
       *[!0-9.]*|''|.*|*.) echo 'BFF_VERSION must look like 1.2.3.' >&2; exit 2 ;;
     esac
-    gh release download "v$BFF_VERSION" --repo "$BFF_REPO" --pattern 'bff-*.tar.gz' --pattern SHA256SUMS --dir "$BFF_STAGE" --clobber </dev/null >&2 || { echo "$BFF_FAIL" >&2; exit 1; }
+  fi
+  if [ "$BFF_USE_GH" = 1 ]; then
+    if [ -n "${BFF_VERSION:-}" ]; then
+      gh release download "v$BFF_VERSION" --repo "$BFF_REPO" --pattern 'bff-*.tar.gz' --pattern SHA256SUMS --dir "$BFF_STAGE" --clobber </dev/null >&2 || { echo "$BFF_FAIL" >&2; exit 1; }
+    else
+      gh release download --repo "$BFF_REPO" --pattern 'bff-*.tar.gz' --pattern SHA256SUMS --dir "$BFF_STAGE" --clobber </dev/null >&2 || { echo "$BFF_FAIL" >&2; exit 1; }
+    fi
   else
-    gh release download --repo "$BFF_REPO" --pattern 'bff-*.tar.gz' --pattern SHA256SUMS --dir "$BFF_STAGE" --clobber </dev/null >&2 || { echo "$BFF_FAIL" >&2; exit 1; }
+    if [ -n "${BFF_VERSION:-}" ]; then
+      BFF_URL=https://github.com/$BFF_REPO/releases/download/v$BFF_VERSION
+    else
+      BFF_URL=https://github.com/$BFF_REPO/releases/latest/download
+    fi
+    bff_fetch() { # url dest
+      if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 2 -o "$2" "$1" </dev/null
+      elif command -v wget >/dev/null 2>&1; then wget -q -O "$2" "$1" </dev/null
+      else echo 'This installer needs curl or wget to download the release.' >&2; return 1
+      fi
+    }
+    bff_fetch "$BFF_URL/SHA256SUMS" "$BFF_STAGE/SHA256SUMS" || { echo "$BFF_FAIL" >&2; exit 1; }
+    # The archive name comes from the one tarball row of SHA256SUMS; the checksum is verified below before anything is extracted.
+    BFF_ROWS=$(awk 'NF == 2 && $2 ~ /^bff-[0-9][0-9.]*\.tar\.gz$/ { print $2 }' "$BFF_STAGE/SHA256SUMS")
+    [ -n "$BFF_ROWS" ] && [ "$(printf '%s\n' "$BFF_ROWS" | wc -l | tr -d ' ')" = 1 ] || { echo "SHA256SUMS does not name exactly one bff archive. $BFF_FAIL" >&2; exit 1; }
+    bff_fetch "$BFF_URL/$BFF_ROWS" "$BFF_STAGE/$BFF_ROWS" || { echo "$BFF_FAIL" >&2; exit 1; }
   fi
 
   # Exactly one bff-<version>.tar.gz; the version comes from its name and is checked before it is used.
