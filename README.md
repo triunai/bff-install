@@ -47,7 +47,7 @@ macOS/Linux (pass them after `sh -s --`, for example `... | sh -s -- --no-setup`
 | `--no-modify-path` | never edit a shell startup file |
 | `--prefix DIR` | install under DIR instead of `~/.local` |
 
-Windows reads environment variables, set before the one-liner: `$env:BFF_YES='1'`, `$env:BFF_NO_SETUP='1'`, `$env:BFF_NO_MODIFY_PATH='1'`, `$env:BFF_PREFIX='D:\tools\bff'`. Both platforms accept `BFF_VERSION=x.y.z` to install a specific release instead of the latest.
+Windows reads environment variables, set before the one-liner: `$env:BFF_YES='1'`, `$env:BFF_NO_SETUP='1'`, `$env:BFF_NO_MODIFY_PATH='1'`, `$env:BFF_PREFIX='D:\tools\bff'`. Both platforms accept `BFF_VERSION=x.y.z` to install a specific release instead of the latest. On Windows, `BFF_RELEASE_DIR=<folder with bff-X.Y.Z.tar.gz and SHA256SUMS>` installs from that folder instead of through `gh` (CI, offline); the SHA-256 check is the same.
 
 ## Uninstall
 

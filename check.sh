@@ -20,11 +20,11 @@ hit 'tokens and keys' 'ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Z
 BAD=$(printf '%s\n' "$FILES" | while IFS= read -r f; do [ -f "$f" ] && grep -oEI 'triunai/[A-Za-z0-9._-]+' "$f" || true; done | sort -u | grep -vxE 'triunai/(bff|bff-install)' || true)
 if [ -n "$BAD" ]; then echo "FAIL: other triunai repos named:"; echo "$BAD"; FAILS=$((FAILS + 1)); fi
 
-for s in install.sh check.sh test/pipe-test.sh; do
+for s in install.sh check.sh test/pipe-test.sh test/pwsh-test.sh; do
   sh -n "$s" || { echo "FAIL: sh -n $s"; FAILS=$((FAILS + 1)); }
 done
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck install.sh check.sh test/pipe-test.sh || { echo 'FAIL: shellcheck'; FAILS=$((FAILS + 1)); }
+  shellcheck install.sh check.sh test/pipe-test.sh test/pwsh-test.sh || { echo 'FAIL: shellcheck'; FAILS=$((FAILS + 1)); }
 else
   echo 'note: shellcheck not installed, skipped'
 fi
