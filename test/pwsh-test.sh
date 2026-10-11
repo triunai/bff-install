@@ -26,7 +26,7 @@ python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$WORK/result.json" &
 if [ -x "$PREFIX/bin/bff" ]; then "$PREFIX/bin/bff" --version | grep -q '^bff ' && ok 'installed bff runs' || bad 'bff --version failed'; else bad 'no command under the prefix'; fi
 
 cp -R "$WORK/release" "$WORK/bad"
-sed 's/^./0/' "$WORK/bad/SHA256SUMS" >"$WORK/bad/SHA256SUMS.new" && mv "$WORK/bad/SHA256SUMS.new" "$WORK/bad/SHA256SUMS"
+sed -e 's/^0/X/' -e 's/^[1-9a-f]/0/' -e 's/^X/1/' "$WORK/bad/SHA256SUMS" >"$WORK/bad/SHA256SUMS.new" && mv "$WORK/bad/SHA256SUMS.new" "$WORK/bad/SHA256SUMS"
 OUT=$(run "$WORK/bad" "$WORK/never" 2>&1) && bad 'corrupt SHA256SUMS installed' || case $OUT in *'checksum mismatch'*) ok 'corrupt SHA256SUMS refused' ;; *) bad 'checksum message'; echo "$OUT" ;; esac
 [ ! -e "$WORK/never" ] && ok 'nothing installed from the corrupt release' || bad 'corrupt release left files'
 
