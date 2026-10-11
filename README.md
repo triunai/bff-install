@@ -1,5 +1,11 @@
 # bff-install
 
+## Why the name
+
+**BFF stands for Built Fucking Fast.** Speed here doesn't mean how quickly an agent types out code. It means not re-deriving decisions that were already made, not losing context when a chat ends, and not finding out days later that the tests never ran the path that broke. The full story is in [the bff README](https://github.com/triunai/bff#why-the-name).
+
+## What this repo is
+
 Short installers for [bff](https://github.com/triunai/bff). This repository holds only the two install scripts; the product lives in the public `triunai/bff` repository and is downloaded over plain HTTPS, verified against its `SHA256SUMS`. No login is needed; if the GitHub CLI (`gh`) is installed and signed in it is used instead.
 
 ## Install
@@ -20,9 +26,18 @@ Run either from any directory. Re-running is safe: it installs the same verified
 
 ## Before you run it
 
-- **Nothing to sign in to.** The release is public and downloads over plain HTTPS. If the GitHub CLI (`gh`) is installed and signed in, it is used instead (`BFF_DOWNLOAD=https` forces the plain download, `BFF_DOWNLOAD=gh` forces `gh`).
-- **Python 3.9 or newer** (`python3` on macOS/Linux, `py -3` or `python` on Windows; the Microsoft Store stub is refused).
-- **BB** is needed for Osiris, not for bff itself. If it is missing, setup tells you what to install and bff still works.
+You don't need npm, nvm or Node to install bff. The only hard requirement is Python.
+
+| Tool | Needed for | Required? |
+| --- | --- | --- |
+| **Python 3.9+** | bff itself, and the installer's checksum check | **Yes.** macOS/Linux: `python3`. Windows: `py -3` or `python` (the Microsoft Store stub is refused); `winget install Python.Python.3.12` if missing. The installer stops and tells you the exact command if it's absent. |
+| `curl` or `wget` | the download on macOS/Linux | Already on every Mac and almost every Linux. Windows uses PowerShell's own downloader. |
+| Git | adopting a repo (`bff` reads your repo's history) | Only for repo features. |
+| Node 22.6+ | the terminal apps (`bff osiris factory`, `worktrees`, `prune`) | No. Only when you use those. Any normal install is found: nodejs.org, Homebrew, nvm, fnm, volta or mise (Windows: Program Files, winget, scoop, fnm, nvm-windows, volta). On Windows install the real `node.exe`; `node.cmd` wrappers are refused. |
+| BB | Osiris, the dashboard inside BB | No. BB is a separate app with its own installer, and it brings its own Node requirement (22.19+). If BB is missing, setup tells you what to install and bff still works. |
+| GitHub CLI (`gh`) | nothing | No. Nothing to sign in to: the release is public and downloads over plain HTTPS. If `gh` is installed and signed in, it's used instead (`BFF_DOWNLOAD=https` forces the plain download, `BFF_DOWNLOAD=gh` forces `gh`). |
+
+npm and nvm only matter if you're developing bff or Osiris (running the Osiris tests or rebuilding the plugin), and then you need Node 24.
 
 ## What it does
 
@@ -77,7 +92,7 @@ Piping a download into a shell runs whatever the URL serves. Read the script fir
 
 ## Windows status
 
-The native Windows path (the `bff.cmd` shim, `%LOCALAPPDATA%` layout, PowerShell installer) is new. It is covered by tests that simulate Windows paths, but it has not yet been run on a real Windows machine. If it fails, the message says why; WSL2 with the macOS/Linux command is the fallback.
+The native Windows path (the `bff.cmd` shim, the `%LOCALAPPDATA%` layout and the PowerShell installer) runs on GitHub's real `windows-latest` machines under PowerShell 5.1 and 7, with Python 3.9 and 3.12. The real `irm ... | iex` one-liner installs the published release there, and `bff doctor` and `bff osiris prune` pass. It hasn't been tried on a personal Windows laptop yet. Herdr and the macOS keep-awake helper have no Windows build. If something fails, the message says why; WSL2 with the macOS/Linux command is the fallback.
 
 ## License
 
